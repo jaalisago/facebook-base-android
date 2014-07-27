@@ -3,6 +3,7 @@ package com.mycompany.myfacebookevents;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,13 +30,25 @@ public class MainFragment extends Fragment {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 	    super.onCreate(savedInstanceState);
-	    uiHelper = new UiLifecycleHelper(getActivity(), callback);
+	    FragmentActivity a = getActivity();
+	    uiHelper = new UiLifecycleHelper(a, callback);
 	    uiHelper.onCreate(savedInstanceState);
 	}
 	
 	@Override
 	public void onResume() {
 	    super.onResume();
+	    
+	    // For scenarios where the main activity is launched and user
+	    // session is not null, the session state change notification
+	    // may not be triggered. Trigger it if it's open/closed.
+	    Session session = Session.getActiveSession();
+	    if (session != null &&
+	           (session.isOpened() || session.isClosed()) ) {
+	        onSessionStateChange(session, session.getState(), null);
+	    }
+
+	    uiHelper.onResume();
 	    uiHelper.onResume();
 	}
 
