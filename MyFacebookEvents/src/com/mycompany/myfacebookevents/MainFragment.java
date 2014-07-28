@@ -1,5 +1,11 @@
 package com.mycompany.myfacebookevents;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -8,10 +14,16 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
+import com.facebook.LoggingBehavior;
+import com.facebook.Request;
+import com.facebook.Response;
 import com.facebook.Session;
 import com.facebook.SessionState;
+import com.facebook.Settings;
 import com.facebook.UiLifecycleHelper;
+import com.facebook.model.GraphUser;
 import com.facebook.widget.LoginButton;
 
 public class MainFragment extends Fragment {
@@ -23,7 +35,10 @@ public class MainFragment extends Fragment {
 	    
 	    LoginButton authButton = (LoginButton) view.findViewById(R.id.authButton);
 	    authButton.setFragment(this);
+	    authButton.setReadPermissions(Arrays.asList("user_location", "user_birthday", "user_likes"));
 
+	    userInfoTextView = (TextView) view.findViewById(R.id.userInfoTextView);
+	    
 	    return view;
 	}
 	
@@ -48,7 +63,6 @@ public class MainFragment extends Fragment {
 	        onSessionStateChange(session, session.getState(), null);
 	    }
 
-	    uiHelper.onResume();
 	    uiHelper.onResume();
 	}
 
@@ -80,9 +94,29 @@ public class MainFragment extends Fragment {
 	
 	private void onSessionStateChange(Session session, SessionState state, Exception exception) {
 	    if (state.isOpened()) {
+	    	userInfoTextView.setVisibility(View.VISIBLE);
+	    	
+	    	if (null == pendingRequest) {
+		        // Request user data and show the results
+		        pendingRequest = Request.newMeRequest(session, new Request.GraphUserCallback() {
+	
+		            @Override
+		            public void onCompleted(GraphUser user, Response response) {
+		                if (user != null) {
+		                    // Display the parsed user info
+		                    userInfoTextView.setText(buildUserInfoDisplay(user));
+		                }
+		            }
+	
+		        });
+		        pendingRequest.executeAsync();
+	    	}
+	        
 	        Log.i(TAG, "Logged in...");
 	    } else if (state.isClosed()) {
 	        Log.i(TAG, "Logged out...");
+	        userInfoTextView.setVisibility(View.INVISIBLE);
+
 	    }
 	}
 
@@ -93,7 +127,51 @@ public class MainFragment extends Fragment {
 	    }
 	};
 	
+	private String buildUserInfoDisplay(GraphUser user) {
+	    StringBuilder userInfo = new StringBuilder("");
+
+	    // Example: typed access (name)
+	    // - no special permissions required
+	    userInfo.append(String.format("Name: %s\n\n", 
+	        user.getName()));
+
+	    // Example: typed access (birthday)
+	    // - requires user_birthday permission
+	    userInfo.append(String.format("Birthday: %s\n\n", 
+	        user.getBirthday()));
+
+	    // Example: partially typed access, to location field,
+	    // name key (location)
+	    // - requires user_location permission
+	    userInfo.append(String.format("Location: %s\n\n", 
+	        user.getLocation().getProperty("name")));
+
+	    // Example: access via property name (locale)
+	    // - no special permissions required
+	    userInfo.append(String.format("Locale: %s\n\n", 
+	        user.getProperty("locale")));
+
+	    // Example: access via key for array (languages) 
+	    // - requires user_likes permission
+	    JSONArray languages = (JSONArray)user.getProperty("languages");
+	    if (languages != null && languages.length() > 0) {
+	        ArrayList<String> languageNames = new ArrayList<String> ();
+	        for (int i=0; i < languages.length(); i++) {
+	            JSONObject language = languages.optJSONObject(i);
+	            // Add the language name to a list. Use JSON
+	            // methods to get access to the name field. 
+	            languageNames.add(language.optString("name"));
+	        }           
+	        userInfo.append(String.format("Languages: %s\n\n", 
+	        languageNames.toString()));
+	    }
+
+	    return userInfo.toString();
+	}
+	
 	private UiLifecycleHelper uiHelper;
+	private TextView userInfoTextView;
+	private Request pendingRequest = null;
 
 
 }
